@@ -1,3 +1,7 @@
+import './App.css'  // ✅ Esta línea debe existir
+
+
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
