@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import DebugInfo from './components/DebugInfo'
+import DebugInfo from './components/ui/DebugInfo' // ✅ RUTA CORREGIDA
 import { api } from './lib/supabase' // ✅ Importar API de Supabase
 
 function App() {
@@ -467,14 +467,11 @@ function App() {
         </div>
       </div>
       
-      {/* ✅ AGREGAR COMPONENTE DEBUG INFO */}
+      {/* ✅ AGREGAR COMPONENTE DEBUG INFO CON RUTA CORRECTA */}
       <DebugInfo />
     </div>
   );
 }
 
 export default App;
-
-
-
 
