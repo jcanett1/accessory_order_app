@@ -17,6 +17,10 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # ✅ AGREGAR: Configuración de environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
     - name: Checkout
@@ -34,7 +38,6 @@ jobs:
         
     - name: Install dependencies
       working-directory: ./frontend
-      # ✅ CAMBIO: Usar --no-frozen-lockfile
       run: pnpm install --no-frozen-lockfile
       
     - name: Build
@@ -50,4 +53,5 @@ jobs:
         path: ./frontend/dist
         
     - name: Deploy to GitHub Pages
+      id: deployment
       uses: actions/deploy-pages@v4
