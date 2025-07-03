@@ -1,9 +1,7 @@
 /* index.css corregido para Tailwind CSS */
 /* Este archivo debe REEMPLAZAR tu frontend/src/index.css */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
 @import "tailwindcss";
 
 /* Estilos base adicionales */
