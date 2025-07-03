@@ -10,7 +10,7 @@ const getApiBaseUrl = () => {
   } else {
     // En GitHub Pages, usar backend desplegado
     // ⚠️ REEMPLAZA CON TU URL REAL DESPUÉS DE DESPLEGAR
-    return 'https://tu-backend.onrender.com'
+    return 'https://jcanett1.github.io/accessory_order_app/'
   }
 }
 
