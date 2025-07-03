@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   // ⚠️ CRÍTICO: Cambiar por el nombre EXACTO de tu repositorio
+  // Si tu repo se llama "mi-app", usar '/mi-app/'
   base: process.env.NODE_ENV === 'production' ? '/accessory_order_app/' : '/',
   
   build: {
@@ -17,14 +18,11 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html')
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
-  },
-  
-  server: {
-    port: 5173,
-    host: true
   }
 })
