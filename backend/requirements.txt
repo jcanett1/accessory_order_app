@@ -1,5 +1,9 @@
-
-Flask
-Flask-Cors
-
+# Dependencias para Flask con Supabase
+Flask==3.0.0
+Flask-CORS==4.0.0
+psycopg2-binary==2.9.9
+pandas==2.1.4
+reportlab==4.0.8
+python-dotenv==1.0.0
+gunicorn==21.2.0
 
