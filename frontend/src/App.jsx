@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import DebugInfo from './components/DebugInfo'
+import { api } from './lib/supabase' // ✅ Importar API de Supabase
 
 function App() {
   const [orders, setOrders] = useState([]);
@@ -9,67 +11,92 @@ function App() {
   const [selected, setSelected] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [loading, setLoading] = useState(false); // ✅ Estado de carga
+  const [error, setError] = useState(''); // ✅ Estado de error
 
   useEffect(() => {
     fetchOrders();
   }, [searchTerm, dateFilter]);
 
+  // ✅ ACTUALIZADO: Usar Supabase en lugar de /api/
   const fetchOrders = async () => {
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (dateFilter) params.append('date', dateFilter);
+      setLoading(true);
+      setError('');
       
-      const response = await fetch(`/api/get_orders?${params}`);
-      const data = await response.json();
+      let data;
+      if (searchTerm || dateFilter) {
+        // Usar búsqueda con filtros
+        data = await api.searchOrders(searchTerm, dateFilter);
+      } else {
+        // Obtener todas las órdenes
+        data = await api.getOrders();
+      }
+      
       setOrders(data);
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setError(`Error al cargar órdenes: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ✅ ACTUALIZADO: Usar Supabase en lugar de /api/
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!orderNumber.trim()) {
+      setError('El número de orden es requerido');
+      return;
+    }
+
     const newOrder = {
-      order_number: orderNumber,
+      order_number: orderNumber.trim(),
       accessories: accessories,
       extra_accessory: extraAccessory,
       selected: selected,
     };
 
     try {
-      await fetch('/api/add_order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newOrder),
-      });
+      setLoading(true);
+      setError('');
+      
+      await api.addOrder(newOrder);
+      
+      // Limpiar formulario
       setOrderNumber('');
       setAccessories([{ accessory_type: 'bolsa', quantity: 1 }]);
       setExtraAccessory(false);
       setSelected(false);
-      fetchOrders();
+      
+      // Recargar órdenes
+      await fetchOrders();
+      
+      console.log('✅ Orden agregada exitosamente');
     } catch (error) {
       console.error('Error adding order:', error);
+      setError(`Error al agregar orden: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ✅ ACTUALIZADO: Usar Supabase en lugar de /api/
   const handleCloseOrder = async (orderId, status) => {
     try {
-      await fetch('/api/close_order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order_id: orderId,
-          accessories_added: status
-        }),
-      });
-      fetchOrders();
+      setLoading(true);
+      setError('');
+      
+      await api.closeOrder(orderId, status);
+      await fetchOrders(); // Recargar órdenes
+      
+      console.log('✅ Orden cerrada exitosamente');
     } catch (error) {
       console.error('Error closing order:', error);
+      setError(`Error al cerrar orden: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,12 +117,15 @@ function App() {
     setAccessories(updatedAccessories);
   };
 
+  // ✅ ACTUALIZADO: Funciones de exportación (por ahora mostrar mensaje)
   const exportToExcel = () => {
-    window.open('/api/export_excel', '_blank');
+    alert('Función de exportación a Excel en desarrollo para Supabase');
+    console.log('📊 Export to Excel - Orders:', orders);
   };
 
   const exportToPDF = () => {
-    window.open('/api/export_pdf', '_blank');
+    alert('Función de exportación a PDF en desarrollo para Supabase');
+    console.log('📄 Export to PDF - Orders:', orders);
   };
 
   // Check if form should be disabled (when extraAccessory is false)
@@ -107,6 +137,20 @@ function App() {
         <h1 className="text-3xl font-bold text-foreground mb-8 text-center">
           Gestión de Órdenes de Accesorios
         </h1>
+        
+        {/* ✅ MOSTRAR ERRORES */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+        
+        {/* ✅ MOSTRAR ESTADO DE CARGA */}
+        {loading && (
+          <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+            <strong>Cargando...</strong> Por favor espere.
+          </div>
+        )}
         
         {/* Form Section */}
         <div className="bg-card rounded-lg shadow-lg p-6 mb-8">
@@ -124,9 +168,9 @@ function App() {
                   type="text"
                   value={orderNumber}
                   onChange={(e) => setOrderNumber(e.target.value)}
-                  disabled={isFormDisabled}
+                  disabled={isFormDisabled || loading}
                   className={`w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
-                    isFormDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                    isFormDisabled || loading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                   required
                 />
@@ -138,6 +182,7 @@ function App() {
                   id="extraAccessory"
                   checked={extraAccessory}
                   onChange={(e) => setExtraAccessory(e.target.checked)}
+                  disabled={loading}
                   className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-ring"
                 />
                 <label htmlFor="extraAccessory" className="text-sm font-medium text-card-foreground">
@@ -151,13 +196,13 @@ function App() {
                   id="selected"
                   checked={selected}
                   onChange={(e) => setSelected(e.target.checked)}
-                  disabled={isFormDisabled}
+                  disabled={isFormDisabled || loading}
                   className={`w-4 h-4 text-primary bg-background border-border rounded focus:ring-ring ${
-                    isFormDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                    isFormDisabled || loading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 />
                 <label htmlFor="selected" className={`text-sm font-medium text-card-foreground ${
-                  isFormDisabled ? 'opacity-50' : ''
+                  isFormDisabled || loading ? 'opacity-50' : ''
                 }`}>
                   Seleccionar
                 </label>
@@ -173,9 +218,9 @@ function App() {
                 <button
                   type="button"
                   onClick={addAccessory}
-                  disabled={isFormDisabled}
+                  disabled={isFormDisabled || loading}
                   className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                    isFormDisabled 
+                    isFormDisabled || loading
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                       : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'
                   }`}
@@ -193,9 +238,9 @@ function App() {
                     <select
                       value={accessory.accessory_type}
                       onChange={(e) => updateAccessory(index, 'accessory_type', e.target.value)}
-                      disabled={isFormDisabled}
+                      disabled={isFormDisabled || loading}
                       className={`w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
-                        isFormDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                        isFormDisabled || loading ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
                       <option value="bolsa">Bolsa</option>
@@ -216,9 +261,9 @@ function App() {
                       value={accessory.quantity}
                       onChange={(e) => updateAccessory(index, 'quantity', parseInt(e.target.value))}
                       min="1"
-                      disabled={isFormDisabled}
+                      disabled={isFormDisabled || loading}
                       className={`w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
-                        isFormDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                        isFormDisabled || loading ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                       required
                     />
@@ -228,9 +273,9 @@ function App() {
                     <button
                       type="button"
                       onClick={() => removeAccessory(index)}
-                      disabled={isFormDisabled || accessories.length === 1}
+                      disabled={isFormDisabled || loading || accessories.length === 1}
                       className={`w-full px-4 py-2 rounded-md font-medium transition-colors ${
-                        isFormDisabled || accessories.length === 1
+                        isFormDisabled || loading || accessories.length === 1
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                           : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                       }`}
@@ -245,14 +290,14 @@ function App() {
             <div className="flex justify-center">
               <button
                 type="submit"
-                disabled={isFormDisabled}
+                disabled={isFormDisabled || loading}
                 className={`px-8 py-3 rounded-md font-medium transition-colors ${
-                  isFormDisabled 
+                  isFormDisabled || loading
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                Agregar Orden
+                {loading ? 'Agregando...' : 'Agregar Orden'}
               </button>
             </div>
           </form>
@@ -280,6 +325,7 @@ function App() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Ingrese número de orden..."
+                disabled={loading}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -292,6 +338,7 @@ function App() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
+                disabled={loading}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -299,13 +346,15 @@ function App() {
             <div className="flex space-x-2 items-end">
               <button
                 onClick={exportToExcel}
-                className="flex-1 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium"
+                disabled={loading}
+                className="flex-1 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium disabled:opacity-50"
               >
                 Exportar a Excel
               </button>
               <button
                 onClick={exportToPDF}
-                className="flex-1 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium"
+                disabled={loading}
+                className="flex-1 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium disabled:opacity-50"
               >
                 Exportar a PDF
               </button>
@@ -383,7 +432,7 @@ function App() {
                       {order.is_closed ? (
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                           order.accessories_added 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                         }`}>
                           {order.accessories_added ? 'Agregados' : 'No Agregados'}
@@ -395,7 +444,8 @@ function App() {
                               handleCloseOrder(order.id, e.target.value === 'agregados');
                             }
                           }}
-                          className="px-2 py-1 border border-border rounded-md bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          disabled={loading}
+                          className="px-2 py-1 border border-border rounded-md bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                           defaultValue=""
                         >
                           <option value="">Accesorios...</option>
@@ -408,7 +458,7 @@ function App() {
                 ))}
               </tbody>
             </table>
-            {orders.length === 0 && (
+            {orders.length === 0 && !loading && (
               <div className="text-center py-8 text-muted-foreground">
                 No se encontraron órdenes que coincidan con los criterios de búsqueda.
               </div>
@@ -416,10 +466,15 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {/* ✅ AGREGAR COMPONENTE DEBUG INFO */}
+      <DebugInfo />
     </div>
   );
 }
 
 export default App;
+
+
 
 
