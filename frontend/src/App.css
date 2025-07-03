@@ -1,6 +1,7 @@
-import './App.css'  // ✅ Esta línea debe existir
+/* App.css corregido para Tailwind CSS */
+/* Este archivo debe REEMPLAZAR tu frontend/src/App.css */
 
-
+/* ❌ REMOVIDO: import './App.css' (eso es JavaScript, no CSS) */
 
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -122,3 +123,4 @@ import './App.css'  // ✅ Esta línea debe existir
     @apply bg-background text-foreground;
   }
 }
+
