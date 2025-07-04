@@ -8,7 +8,7 @@ function App() {
   const [orderNumber, setOrderNumber] = useState('');
   const [accessories, setAccessories] = useState([{ accessory_type: 'bolsa', quantity: 1 }]);
   const [extraAccessory, setExtraAccessory] = useState(false);
-  const [selected, setSelected] = useState(false);
+  const [celda, setCelda] = useState(''); // ✅ CAMBIADO: de 'selected' a 'celda'
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,11 +51,16 @@ function App() {
       return;
     }
 
+    if (!celda) {
+      setError('Debe seleccionar una celda');
+      return;
+    }
+
     const newOrder = {
       order_number: orderNumber.trim(),
       accessories: accessories,
       extra_accessory: extraAccessory,
-      selected: selected,
+      celda: celda, // ✅ CAMBIADO: enviar celda en lugar de selected
     };
 
     try {
@@ -67,7 +72,7 @@ function App() {
       setOrderNumber('');
       setAccessories([{ accessory_type: 'bolsa', quantity: 1 }]);
       setExtraAccessory(false);
-      setSelected(false);
+      setCelda(''); // ✅ CAMBIADO: limpiar celda
       
       await fetchOrders();
       
@@ -164,7 +169,7 @@ const exportToExcel = () => {
           `${acc.accessory_type} (x${acc.quantity})`
         ).join(', ') || '',
         'Accesorio Extra': order.extra_accessory ? 'Sí' : 'No',
-        'Seleccionado': order.selected ? 'Sí' : 'No',
+        'Celda': order.celda || order.selected ? (order.celda || 'Sí') : 'No', // ✅ CAMBIADO: mostrar celda
         'Fecha de Orden': new Date(order.order_date).toLocaleString('es-ES'),
         'Estado': order.is_closed ? 
           (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
@@ -181,7 +186,7 @@ const exportToExcel = () => {
         { wch: 15 }, // Número de Orden
         { wch: 30 }, // Accesorios
         { wch: 15 }, // Accesorio Extra
-        { wch: 12 }, // Seleccionado
+        { wch: 12 }, // Celda
         { wch: 20 }, // Fecha de Orden
         { wch: 20 }  // Estado
       ];
@@ -232,7 +237,7 @@ const exportToPDF = () => {
           `${acc.accessory_type} (x${acc.quantity})`
         ).join(', ') || '',
         order.extra_accessory ? 'Sí' : 'No',
-        order.selected ? 'Sí' : 'No',
+        order.celda || order.selected ? (order.celda || 'Sí') : 'No', // ✅ CAMBIADO: mostrar celda
         new Date(order.order_date).toLocaleDateString('es-ES'),
         order.is_closed ? 
           (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
@@ -241,7 +246,7 @@ const exportToPDF = () => {
 
       // Configurar tabla
       doc.autoTable({
-        head: [['Número de Orden', 'Accesorios', 'Extra', 'Seleccionado', 'Fecha', 'Estado']],
+        head: [['Número de Orden', 'Accesorios', 'Extra', 'Celda', 'Fecha', 'Estado']], // ✅ CAMBIADO: header
         body: tableData,
         startY: 35,
         styles: {
@@ -257,7 +262,7 @@ const exportToPDF = () => {
           0: { cellWidth: 25 }, // Número de Orden
           1: { cellWidth: 40 }, // Accesorios
           2: { cellWidth: 15 }, // Extra
-          3: { cellWidth: 20 }, // Seleccionado
+          3: { cellWidth: 20 }, // Celda
           4: { cellWidth: 25 }, // Fecha
           5: { cellWidth: 35 }  // Estado
         },
@@ -339,22 +344,26 @@ const exportToPDF = () => {
                 </label>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="selected"
-                  checked={selected}
-                  onChange={(e) => setSelected(e.target.checked)}
+              {/* ✅ CAMBIADO: Select dropdown en lugar de checkbox */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-card-foreground">
+                  Seleccionar Celda:
+                </label>
+                <select
+                  value={celda}
+                  onChange={(e) => setCelda(e.target.value)}
                   disabled={isFormDisabled || loading}
-                  className={`w-4 h-4 text-primary bg-background border-border rounded focus:ring-ring ${
+                  className={`w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
                     isFormDisabled || loading ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
-                />
-                <label htmlFor="selected" className={`text-sm font-medium text-card-foreground ${
-                  isFormDisabled || loading ? 'opacity-50' : ''
-                }`}>
-                  Seleccionar
-                </label>
+                  required
+                >
+                  <option value="">Seleccionar Celda</option>
+                  <option value="Celda 10">Celda 10</option>
+                  <option value="Celda 11">Celda 11</option>
+                  <option value="Celda 15">Celda 15</option>
+                  <option value="Celda 16">Celda 16</option>
+                </select>
               </div>
             </div>
 
@@ -529,7 +538,7 @@ const exportToPDF = () => {
                     Accesorio Extra
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-card-foreground">
-                    Seleccionado
+                    Celda {/* ✅ CAMBIADO: header de tabla */}
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-card-foreground">
                     Fecha de Orden
@@ -565,12 +574,13 @@ const exportToPDF = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-card-foreground">
+                      {/* ✅ CAMBIADO: mostrar celda en lugar de selected */}
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        order.selected 
+                        order.celda || order.selected
                           ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
                           : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
                       }`}>
-                        {order.selected ? 'Sí' : 'No'}
+                        {order.celda || (order.selected ? 'Sí' : 'No')}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-card-foreground text-sm">
