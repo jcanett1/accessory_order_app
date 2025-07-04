@@ -157,126 +157,169 @@ function App() {
     setAccessories(updatedAccessories);
   };
 
-// 📊 Funciones de exportación con importaciones estáticas
-// Reemplazar las funciones exportToExcel y exportToPDF en tu App.jsx
+  // ✅ FUNCIÓN PARA EXPORTAR A EXCEL (versión dinámica robusta)
+  const exportToExcel = async () => {
+    try {
+      console.log('📊 Iniciando exportación a Excel...');
+      
+      // ✅ IMPORTACIÓN DINÁMICA ROBUSTA
+      let XLSX;
+      try {
+        const xlsxModule = await import('xlsx');
+        XLSX = xlsxModule.default || xlsxModule;
+      } catch (importError) {
+        console.error('❌ Error importando XLSX:', importError);
+        setError('Error: Librería de Excel no disponible. Recargue la página e intente nuevamente.');
+        return;
+      }
 
-// ✅ FUNCIÓN PARA EXPORTAR A EXCEL (versión estática)
-const exportToExcel = () => {
-  try {
-    console.log('📊 Iniciando exportación a Excel...')
-    
-    // Preparar datos para Excel
-    const excelData = orders.map(order => ({
-      'Número de Orden': order.order_number,
-      'Accesorios': order.accessories?.map(acc => 
-        `${acc.accessory_type} (x${acc.quantity})`
-      ).join(', ') || '',
-      'Accesorio Extra': order.extra_accessory ? 'Sí' : 'No',
-      'Celda': order.celda || 'No especificada',
-      'Fecha de Orden': new Date(order.order_date).toLocaleDateString('es-ES'),
-      'Estado': order.is_closed ? 
-        (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
-        'Abierta'
-    }))
+      // Verificar que XLSX se cargó correctamente
+      if (!XLSX || !XLSX.utils || !XLSX.writeFile) {
+        console.error('❌ XLSX no se cargó correctamente');
+        setError('Error: Librería de Excel no se cargó correctamente.');
+        return;
+      }
+      
+      // Preparar datos para Excel
+      const excelData = orders.map(order => ({
+        'Número de Orden': order.order_number,
+        'Accesorios': order.accessories?.map(acc => 
+          `${acc.accessory_type} (x${acc.quantity})`
+        ).join(', ') || '',
+        'Accesorio Extra': order.extra_accessory ? 'Sí' : 'No',
+        'Celda': order.celda || 'No especificada',
+        'Fecha de Orden': new Date(order.order_date).toLocaleDateString('es-ES'),
+        'Estado': order.is_closed ? 
+          (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
+          'Abierta'
+      }));
 
-    // Crear libro de trabajo
-    const worksheet = XLSX.utils.json_to_sheet(excelData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Órdenes de Accesorios')
+      // Crear libro de trabajo
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Órdenes de Accesorios');
 
-    // Ajustar ancho de columnas
-    const columnWidths = [
-      { wch: 15 }, // Número de Orden
-      { wch: 30 }, // Accesorios
-      { wch: 15 }, // Accesorio Extra
-      { wch: 12 }, // Celda
-      { wch: 20 }, // Fecha de Orden
-      { wch: 20 }  // Estado
-    ]
-    worksheet['!cols'] = columnWidths
+      // Ajustar ancho de columnas
+      const columnWidths = [
+        { wch: 15 }, // Número de Orden
+        { wch: 30 }, // Accesorios
+        { wch: 15 }, // Accesorio Extra
+        { wch: 12 }, // Celda
+        { wch: 20 }, // Fecha de Orden
+        { wch: 20 }  // Estado
+      ];
+      worksheet['!cols'] = columnWidths;
 
-    // Generar nombre de archivo con fecha
-    const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.xlsx`
-    
-    // Descargar archivo
-    XLSX.writeFile(workbook, fileName)
-    
-    console.log('✅ Archivo Excel generado exitosamente:', fileName)
-  } catch (error) {
-    console.error('❌ Error exportando a Excel:', error)
-    setError(`Error al exportar a Excel: ${error.message}`)
-  }
-}
+      // Generar nombre de archivo con fecha
+      const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Descargar archivo
+      XLSX.writeFile(workbook, fileName);
+      
+      console.log('✅ Archivo Excel generado exitosamente:', fileName);
+    } catch (error) {
+      console.error('❌ Error exportando a Excel:', error);
+      setError(`Error al exportar a Excel: ${error.message}`);
+    }
+  };
 
-// ✅ FUNCIÓN PARA EXPORTAR A PDF (versión estática)
-const exportToPDF = () => {
-  try {
-    console.log('📄 Iniciando exportación a PDF...')
-    
-    // Crear documento PDF
-    const doc = new jsPDF()
-    
-    // Título del documento
-    doc.setFontSize(16)
-    doc.text('Lista de Órdenes de Accesorios', 14, 22)
-    
-    // Fecha de generación
-    doc.setFontSize(10)
-    doc.text(`Generado el: ${new Date().toLocaleDateString('es-ES')}`, 14, 30)
-    
-    // Preparar datos para la tabla
-    const tableData = orders.map(order => [
-      order.order_number,
-      order.accessories?.map(acc => 
-        `${acc.accessory_type} (x${acc.quantity})`
-      ).join(', ') || '',
-      order.extra_accessory ? 'Sí' : 'No',
-      order.celda || 'No especificada',
-      new Date(order.order_date).toLocaleDateString('es-ES'),
-      order.is_closed ? 
-        (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
-        'Abierta'
-    ])
+  // ✅ FUNCIÓN PARA EXPORTAR A PDF (versión dinámica robusta)
+  const exportToPDF = async () => {
+    try {
+      console.log('📄 Iniciando exportación a PDF...');
+      
+      // ✅ IMPORTACIÓN DINÁMICA ROBUSTA
+      let jsPDF;
+      try {
+        const [jsPDFModule, autoTableModule] = await Promise.all([
+          import('jspdf'),
+          import('jspdf-autotable')
+        ]);
+        
+        jsPDF = jsPDFModule.jsPDF || jsPDFModule.default?.jsPDF || jsPDFModule.default;
+        // autoTable se agrega automáticamente al prototipo de jsPDF
+      } catch (importError) {
+        console.error('❌ Error importando librerías PDF:', importError);
+        setError('Error: Librerías de PDF no disponibles. Recargue la página e intente nuevamente.');
+        return;
+      }
 
-    // Configurar tabla
-    doc.autoTable({
-      head: [['Número de Orden', 'Accesorios', 'Extra', 'Celda', 'Fecha', 'Estado']],
-      body: tableData,
-      startY: 35,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 25 }, // Número de Orden
-        1: { cellWidth: 40 }, // Accesorios
-        2: { cellWidth: 15 }, // Extra
-        3: { cellWidth: 20 }, // Celda
-        4: { cellWidth: 25 }, // Fecha
-        5: { cellWidth: 35 }  // Estado
-      },
-      margin: { top: 35 },
-    })
+      // Verificar que jsPDF se cargó correctamente
+      if (!jsPDF) {
+        console.error('❌ jsPDF no se cargó correctamente');
+        setError('Error: Librería de PDF no se cargó correctamente.');
+        return;
+      }
+      
+      // Crear documento PDF
+      const doc = new jsPDF();
+      
+      // Verificar que autoTable está disponible
+      if (!doc.autoTable) {
+        console.error('❌ autoTable no está disponible');
+        setError('Error: Plugin de tablas PDF no disponible.');
+        return;
+      }
+      
+      // Título del documento
+      doc.setFontSize(16);
+      doc.text('Lista de Órdenes de Accesorios', 14, 22);
+      
+      // Fecha de generación
+      doc.setFontSize(10);
+      doc.text(`Generado el: ${new Date().toLocaleDateString('es-ES')}`, 14, 30);
+      
+      // Preparar datos para la tabla
+      const tableData = orders.map(order => [
+        order.order_number,
+        order.accessories?.map(acc => 
+          `${acc.accessory_type} (x${acc.quantity})`
+        ).join(', ') || '',
+        order.extra_accessory ? 'Sí' : 'No',
+        order.celda || 'No especificada',
+        new Date(order.order_date).toLocaleDateString('es-ES'),
+        order.is_closed ? 
+          (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
+          'Abierta'
+      ]);
 
-    // Generar nombre de archivo con fecha
-    const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.pdf`
-    
-    // Descargar archivo
-    doc.save(fileName)
-    
-    console.log('✅ Archivo PDF generado exitosamente:', fileName)
-  } catch (error) {
-    console.error('❌ Error exportando a PDF:', error)
-    setError(`Error al exportar a PDF: ${error.message}`)
-  }
-}
+      // Configurar tabla
+      doc.autoTable({
+        head: [['Número de Orden', 'Accesorios', 'Extra', 'Celda', 'Fecha', 'Estado']],
+        body: tableData,
+        startY: 35,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        columnStyles: {
+          0: { cellWidth: 25 }, // Número de Orden
+          1: { cellWidth: 40 }, // Accesorios
+          2: { cellWidth: 15 }, // Extra
+          3: { cellWidth: 20 }, // Celda
+          4: { cellWidth: 25 }, // Fecha
+          5: { cellWidth: 35 }  // Estado
+        },
+        margin: { top: 35 },
+      });
 
-
+      // Generar nombre de archivo con fecha
+      const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      // Descargar archivo
+      doc.save(fileName);
+      
+      console.log('✅ Archivo PDF generado exitosamente:', fileName);
+    } catch (error) {
+      console.error('❌ Error exportando a PDF:', error);
+      setError(`Error al exportar a PDF: ${error.message}`);
+    }
+  };
 
   const isFormDisabled = !extraAccessory;
 
