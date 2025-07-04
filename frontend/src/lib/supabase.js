@@ -1,4 +1,4 @@
-// Configuración de Supabase para GitHub Pages
+// Configuración de Supabase CORREGIDA para usar columna 'celda'
 // Este archivo debe REEMPLAZAR tu frontend/src/lib/supabase.js
 
 import { createClient } from '@supabase/supabase-js'
@@ -44,22 +44,17 @@ export const testConnection = async () => {
   }
 }
 
-// API con mejor manejo de errores
+// ✅ API CORREGIDA para usar estructura de tabla actualizada
 export const api = {
   // Obtener todas las órdenes
   async getOrders() {
     try {
       console.log('📥 Fetching orders...')
       
+      // ✅ CORREGIDO: Obtener directamente de la tabla orders (sin joins)
       const { data: orders, error } = await supabase
         .from('orders')
-        .select(`
-          *,
-          order_accessories (
-            accessory_type,
-            quantity
-          )
-        `)
+        .select('*')
         .order('order_date', { ascending: false })
 
       if (error) {
@@ -69,100 +64,112 @@ export const api = {
 
       console.log('✅ Orders fetched successfully:', orders.length, 'orders')
 
-      // Transformar para compatibilidad con tu frontend
-      const transformedOrders = orders.map(order => ({
-        ...order,
-        accessories: order.order_accessories || []
-      }))
+      // ✅ NUEVO: Agrupar por order_number para compatibilidad con frontend
+      const groupedOrders = {}
+      
+      orders.forEach(order => {
+        const orderNum = order.order_number
+        
+        if (!groupedOrders[orderNum]) {
+          groupedOrders[orderNum] = {
+            id: order.id,
+            order_number: orderNum,
+            extra_accessory: order.extra_accessory,
+            celda: order.celda, // ✅ USAR CELDA en lugar de selected
+            order_date: order.order_date,
+            is_closed: order.is_closed,
+            accessories_added: order.accessories_added,
+            accessories: []
+          }
+        }
+        
+        // Agregar accesorio a la lista
+        groupedOrders[orderNum].accessories.push({
+          accessory_type: order.accessory_type,
+          quantity: order.quantity
+        })
+      })
 
-      return transformedOrders
+      return Object.values(groupedOrders)
     } catch (error) {
       console.error('❌ Error in getOrders:', error)
       throw error
     }
   },
 
-  // Agregar nueva orden
+  // ✅ CORREGIDO: Agregar nueva orden usando 'celda'
   async addOrder(orderData) {
     try {
       console.log('📤 Adding order:', orderData)
       
-      const { order_number, extra_accessory, selected, accessories } = orderData
+      const { order_number, extra_accessory, celda, accessories } = orderData
 
-      // Verificar si ya existe
-      const { data: existing, error: checkError } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('order_number', order_number)
-        .maybeSingle() // Usar maybeSingle en lugar de single para evitar errores si no existe
-
-      if (checkError) {
-        console.error('❌ Error checking existing order:', checkError)
-        throw new Error(`Check error: ${checkError.message}`)
+      // ✅ VALIDAR: Que celda sea una opción válida
+      const validCeldas = ['Celda 10', 'Celda 11', 'Celda 15', 'Celda 16']
+      if (!validCeldas.includes(celda)) {
+        throw new Error(`Celda inválida. Opciones válidas: ${validCeldas.join(', ')}`)
       }
 
-      if (existing) {
-        throw new Error('El número de orden ya existe')
-      }
-
-      // Insertar orden
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert({
+      // ✅ CORREGIDO: Insertar cada accesorio como fila separada
+      const ordersToInsert = []
+      
+      for (const accessory of accessories) {
+        ordersToInsert.push({
           order_number,
+          accessory_type: accessory.accessory_type,
+          quantity: accessory.quantity,
           extra_accessory: extra_accessory || false,
-          selected: selected || false,
+          celda: celda, // ✅ USAR CELDA en lugar de selected
           order_date: new Date().toISOString(),
+          is_closed: false,
+          accessories_added: false
         })
+      }
+
+      // Insertar todas las filas
+      const { data: newOrders, error: orderError } = await supabase
+        .from('orders')
+        .insert(ordersToInsert)
         .select()
-        .single()
 
       if (orderError) {
         console.error('❌ Error inserting order:', orderError)
         throw new Error(`Insert error: ${orderError.message}`)
       }
 
-      console.log('✅ Order inserted:', newOrder)
-
-      // Insertar accesorios si existen
-      if (accessories && accessories.length > 0) {
-        const accessoriesData = accessories.map(accessory => ({
-          order_id: newOrder.id,
-          accessory_type: accessory.type || accessory.accessory_type,
-          quantity: accessory.quantity,
-        }))
-
-        const { error: accessoriesError } = await supabase
-          .from('order_accessories')
-          .insert(accessoriesData)
-
-        if (accessoriesError) {
-          console.error('❌ Error inserting accessories:', accessoriesError)
-          throw new Error(`Accessories error: ${accessoriesError.message}`)
-        }
-
-        console.log('✅ Accessories inserted:', accessoriesData.length)
-      }
-
-      return { message: 'Orden agregada exitosamente', order_id: newOrder.id }
+      console.log('✅ Order inserted:', newOrders)
+      return { message: 'Orden agregada exitosamente', orders: newOrders }
     } catch (error) {
       console.error('❌ Error in addOrder:', error)
       throw error
     }
   },
 
-  // Cerrar orden
+  // ✅ CORREGIDO: Cerrar orden por order_number
   async closeOrder(orderId, accessoriesAdded) {
     try {
       console.log('🔒 Closing order:', orderId)
       
+      // Obtener order_number del ID proporcionado
+      const { data: orderInfo, error: getError } = await supabase
+        .from('orders')
+        .select('order_number')
+        .eq('id', orderId)
+        .single()
+
+      if (getError) {
+        console.error('❌ Error getting order info:', getError)
+        throw new Error(`Get error: ${getError.message}`)
+      }
+
+      // Actualizar todas las filas con el mismo order_number
       const { data, error } = await supabase
         .from('orders')
         .update({
           is_closed: true,
           accessories_added: accessoriesAdded || false,
         })
-        .eq('id', orderId)
+        .eq('order_number', orderInfo.order_number)
         .select()
 
       if (error) {
@@ -182,24 +189,18 @@ export const api = {
     }
   },
 
-  // Buscar órdenes
+  // ✅ CORREGIDO: Buscar órdenes incluyendo celda
   async searchOrders(query, date) {
     try {
       console.log('🔍 Searching orders:', { query, date })
       
       let queryBuilder = supabase
         .from('orders')
-        .select(`
-          *,
-          order_accessories (
-            accessory_type,
-            quantity
-          )
-        `)
+        .select('*')
 
       // Aplicar filtros
       if (query) {
-        queryBuilder = queryBuilder.ilike('order_number', `%${query}%`)
+        queryBuilder = queryBuilder.or(`order_number.ilike.%${query}%,accessory_type.ilike.%${query}%,celda.ilike.%${query}%`)
       }
 
       if (date) {
@@ -218,13 +219,32 @@ export const api = {
 
       console.log('✅ Search completed:', orders.length, 'orders found')
 
-      // Transformar datos
-      const transformedOrders = orders.map(order => ({
-        ...order,
-        accessories: order.order_accessories || []
-      }))
+      // ✅ AGRUPAR: Misma lógica que getOrders
+      const groupedOrders = {}
+      
+      orders.forEach(order => {
+        const orderNum = order.order_number
+        
+        if (!groupedOrders[orderNum]) {
+          groupedOrders[orderNum] = {
+            id: order.id,
+            order_number: orderNum,
+            extra_accessory: order.extra_accessory,
+            celda: order.celda, // ✅ USAR CELDA
+            order_date: order.order_date,
+            is_closed: order.is_closed,
+            accessories_added: order.accessories_added,
+            accessories: []
+          }
+        }
+        
+        groupedOrders[orderNum].accessories.push({
+          accessory_type: order.accessory_type,
+          quantity: order.quantity
+        })
+      })
 
-      return transformedOrders
+      return Object.values(groupedOrders)
     } catch (error) {
       console.error('❌ Error in searchOrders:', error)
       throw error
