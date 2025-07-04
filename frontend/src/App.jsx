@@ -152,15 +152,134 @@ function App() {
     setAccessories(updatedAccessories);
   };
 
-  const exportToExcel = () => {
-    alert('Función de exportación a Excel en desarrollo para Supabase');
-    console.log('📊 Export to Excel - Orders:', orders);
-  };
+ // ✅ FUNCIÓN PARA EXPORTAR A EXCEL
+const exportToExcel = () => {
+  try {
+    // Importar la librería (debe estar instalada)
+    import('xlsx').then((XLSX) => {
+      // Preparar datos para Excel
+      const excelData = orders.map(order => ({
+        'Número de Orden': order.order_number,
+        'Accesorios': order.accessories?.map(acc => 
+          `${acc.accessory_type} (x${acc.quantity})`
+        ).join(', ') || '',
+        'Accesorio Extra': order.extra_accessory ? 'Sí' : 'No',
+        'Seleccionado': order.selected ? 'Sí' : 'No',
+        'Fecha de Orden': new Date(order.order_date).toLocaleString('es-ES'),
+        'Estado': order.is_closed ? 
+          (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
+          'Abierta'
+      }));
 
-  const exportToPDF = () => {
-    alert('Función de exportación a PDF en desarrollo para Supabase');
-    console.log('📄 Export to PDF - Orders:', orders);
-  };
+      // Crear libro de trabajo
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Órdenes de Accesorios');
+
+      // Ajustar ancho de columnas
+      const columnWidths = [
+        { wch: 15 }, // Número de Orden
+        { wch: 30 }, // Accesorios
+        { wch: 15 }, // Accesorio Extra
+        { wch: 12 }, // Seleccionado
+        { wch: 20 }, // Fecha de Orden
+        { wch: 20 }  // Estado
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Generar nombre de archivo con fecha
+      const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Descargar archivo
+      XLSX.writeFile(workbook, fileName);
+      
+      console.log('✅ Archivo Excel generado exitosamente');
+    }).catch(error => {
+      console.error('Error al cargar librería XLSX:', error);
+      alert('Error: Librería de Excel no disponible. Instale xlsx: pnpm add xlsx');
+    });
+  } catch (error) {
+    console.error('Error exportando a Excel:', error);
+    alert('Error al exportar a Excel. Revise la consola para más detalles.');
+  }
+};
+
+// ✅ FUNCIÓN PARA EXPORTAR A PDF
+const exportToPDF = () => {
+  try {
+    // Importar las librerías (deben estar instaladas)
+    Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ]).then(([jsPDFModule, autoTableModule]) => {
+      const { jsPDF } = jsPDFModule.default || jsPDFModule;
+      
+      // Crear documento PDF
+      const doc = new jsPDF();
+      
+      // Título del documento
+      doc.setFontSize(16);
+      doc.text('Lista de Órdenes de Accesorios', 14, 22);
+      
+      // Fecha de generación
+      doc.setFontSize(10);
+      doc.text(`Generado el: ${new Date().toLocaleString('es-ES')}`, 14, 30);
+      
+      // Preparar datos para la tabla
+      const tableData = orders.map(order => [
+        order.order_number,
+        order.accessories?.map(acc => 
+          `${acc.accessory_type} (x${acc.quantity})`
+        ).join(', ') || '',
+        order.extra_accessory ? 'Sí' : 'No',
+        order.selected ? 'Sí' : 'No',
+        new Date(order.order_date).toLocaleDateString('es-ES'),
+        order.is_closed ? 
+          (order.accessories_added ? 'Cerrada - Agregados' : 'Cerrada - No Agregados') : 
+          'Abierta'
+      ]);
+
+      // Configurar tabla
+      doc.autoTable({
+        head: [['Número de Orden', 'Accesorios', 'Extra', 'Seleccionado', 'Fecha', 'Estado']],
+        body: tableData,
+        startY: 35,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        columnStyles: {
+          0: { cellWidth: 25 }, // Número de Orden
+          1: { cellWidth: 40 }, // Accesorios
+          2: { cellWidth: 15 }, // Extra
+          3: { cellWidth: 20 }, // Seleccionado
+          4: { cellWidth: 25 }, // Fecha
+          5: { cellWidth: 35 }  // Estado
+        },
+        margin: { top: 35 },
+      });
+
+      // Generar nombre de archivo con fecha
+      const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      // Descargar archivo
+      doc.save(fileName);
+      
+      console.log('✅ Archivo PDF generado exitosamente');
+    }).catch(error => {
+      console.error('Error al cargar librerías PDF:', error);
+      alert('Error: Librerías de PDF no disponibles. Instale: pnpm add jspdf jspdf-autotable');
+    });
+  } catch (error) {
+    console.error('Error exportando a PDF:', error);
+    alert('Error al exportar a PDF. Revise la consola para más detalles.');
+  }
+};
 
   const isFormDisabled = !extraAccessory;
 
