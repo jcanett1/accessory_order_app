@@ -10,7 +10,6 @@ export default defineConfig({
     },
   },
   // ⚠️ CRÍTICO: Cambiar por el nombre EXACTO de tu repositorio
-  // Si tu repo se llama "mi-app", usar '/mi-app/'
   base: process.env.NODE_ENV === 'production' ? '/accessory_order_app/' : '/',
   
   build: {
@@ -24,5 +23,21 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
+  },
+  
+  // ✅ OPTIMIZACIÓN: Pre-bundling de dependencias problemáticas
+  optimizeDeps: {
+    include: [
+      'xlsx',
+      'jspdf',
+      'jspdf-autotable'
+    ],
+    exclude: []
+  },
+  
+  // ✅ CONFIGURACIÓN: Para manejar CommonJS modules
+  define: {
+    global: 'globalThis',
   }
 })
+
