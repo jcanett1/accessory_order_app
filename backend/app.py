@@ -85,29 +85,41 @@ def index():
 def add_order():
     data = request.get_json()
     try:
-        order_number = data['order_number']
-        accessory_type = data['accessory_type']
-        quantity = data['quantity']
-        extra_accessory = data['extra_accessory']
-        selected = data['selected']  # Esto viene como 'celda', 'celda 10', etc.
-        order_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Validar datos
+        required_fields = ['order_number', 'accessory_type', 'quantity', 'extra_accessory', 'selected']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Faltan campos requeridos'}), 400
 
-        # Si necesitas convertir los valores de celda a booleano (opcional)
-        # selected_boolean = selected in ['celda 10', 'celda 11']  # Ejemplo
-        
+        # Validar valor de selected
+        valid_selections = ['celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16']
+        if data['selected'] not in valid_selections:
+            return jsonify({'error': f'Valor no válido para selected. Use: {", ".join(valid_selections)}'}), 400
+
         db = get_db()
         cursor = db.cursor()
         
-        # Insertar con el valor de celda directamente (asegúrate que la columna sea TEXT)
+        # Forzar recarga del esquema
+        cursor.execute("PRAGMA schema_version = schema_version + 1")
+        
         cursor.execute(
             "INSERT INTO orders (order_number, accessory_type, quantity, extra_accessory, selected, order_date) VALUES (?, ?, ?, ?, ?, ?)",
-            (order_number, accessory_type, quantity, extra_accessory, selected, order_date)
+            (
+                data['order_number'],
+                data['accessory_type'],
+                data['quantity'],
+                data['extra_accessory'],
+                data['selected'],
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            )
         )
         db.commit()
-        return jsonify({'message': 'Order added successfully'}), 201
+        return jsonify({'message': 'Orden agregada exitosamente'}), 201
+        
+    except sqlite3.Error as e:
+        db.rollback()
+        return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({'error': f'Error al agregar orden: {str(e)}'}), 500
-
+        return jsonify({'error': f'Error inesperado: {str(e)}'}), 500
 @app.route('/api/get_orders', methods=['GET'])
 def get_orders():
     search_term = request.args.get('search', '')
