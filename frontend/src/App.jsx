@@ -160,11 +160,6 @@ function App() {
 // 📊 Funciones de exportación con importaciones estáticas
 // Reemplazar las funciones exportToExcel y exportToPDF en tu App.jsx
 
-// ✅ IMPORTACIONES ESTÁTICAS (agregar al inicio de App.jsx)
-import * as XLSX from 'xlsx'
-import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
-
 // ✅ FUNCIÓN PARA EXPORTAR A EXCEL (versión estática)
 const exportToExcel = () => {
   try {
