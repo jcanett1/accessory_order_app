@@ -44,26 +44,29 @@ def index():
 @app.route('/api/add_order', methods=['POST'])
 def add_order():
     data = request.get_json()
-    order_number = data['order_number']
-    accessory_type = data['accessory_type']
-    quantity = data['quantity']
-    extra_accessory = data['extra_accessory']
-    selected = data['selected']
-    order_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        order_number = data['order_number']
+        accessory_type = data['accessory_type']
+        quantity = data['quantity']
+        extra_accessory = data['extra_accessory']
+        selected = data['selected']  # Esto viene como 'celda', 'celda 10', etc.
+        order_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # Validar que el valor de selected sea uno de los permitidos
-    valid_selections = ['celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16']
-    if selected not in valid_selections:
-        return jsonify({'error': 'Valor no válido para selected'}), 400
-
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute(
-        "INSERT INTO orders (order_number, accessory_type, quantity, extra_accessory, selected, order_date) VALUES (?, ?, ?, ?, ?, ?)",
-        (order_number, accessory_type, quantity, extra_accessory, selected, order_date)
-    )
-    db.commit()
-    return jsonify({'message': 'Order added successfully'}), 201
+        # Si necesitas convertir los valores de celda a booleano (opcional)
+        # selected_boolean = selected in ['celda 10', 'celda 11']  # Ejemplo
+        
+        db = get_db()
+        cursor = db.cursor()
+        
+        # Insertar con el valor de celda directamente (asegúrate que la columna sea TEXT)
+        cursor.execute(
+            "INSERT INTO orders (order_number, accessory_type, quantity, extra_accessory, selected, order_date) VALUES (?, ?, ?, ?, ?, ?)",
+            (order_number, accessory_type, quantity, extra_accessory, selected, order_date)
+        )
+        db.commit()
+        return jsonify({'message': 'Order added successfully'}), 201
+    except Exception as e:
+        return jsonify({'error': f'Error al agregar orden: {str(e)}'}), 500
 
 @app.route('/api/get_orders', methods=['GET'])
 def get_orders():
