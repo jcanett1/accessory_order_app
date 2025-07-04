@@ -24,18 +24,58 @@ def init_db():
     with app.app_context():
         db = get_db()
         cursor = db.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_number TEXT NOT NULL,
-                accessory_type TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                extra_accessory BOOLEAN NOT NULL,
-                selected TEXT NOT NULL CHECK(selected IN ('celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16')),
-                order_date TEXT NOT NULL
-            )
-        ''')
-        db.commit()
+        
+        # Verificar si la columna 'selected' existe
+        cursor.execute("PRAGMA table_info(orders)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'selected' not in columns:
+            # Migración segura sin perder datos
+            try:
+                cursor.execute('''
+                    ALTER TABLE orders 
+                    ADD COLUMN selected TEXT 
+                    NOT NULL DEFAULT 'celda'
+                    CHECK(selected IN ('celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16'))
+                ''')
+                db.commit()
+                print("Columna 'selected' añadida correctamente")
+            except sqlite3.OperationalError as e:
+                print(f"Error al añadir columna: {e}")
+                # Si ALTER TABLE falla, usar el método de respaldo
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS new_orders (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        order_number TEXT NOT NULL,
+                        accessory_type TEXT NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        extra_accessory BOOLEAN NOT NULL,
+                        selected TEXT NOT NULL DEFAULT 'celda'
+                            CHECK(selected IN ('celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16')),
+                        order_date TEXT NOT NULL
+                    )
+                ''')
+                
+                # Copiar datos
+                cursor.execute('''
+                    INSERT INTO new_orders 
+                    (id, order_number, accessory_type, quantity, extra_accessory, selected, order_date)
+                    SELECT 
+                        id, 
+                        order_number, 
+                        accessory_type, 
+                        quantity, 
+                        extra_accessory,
+                        'celda' as selected,  # Valor por defecto
+                        order_date
+                    FROM orders
+                ''')
+                
+                # Reemplazar tabla
+                cursor.execute('DROP TABLE orders')
+                cursor.execute('ALTER TABLE new_orders RENAME TO orders')
+                db.commit()
+                print("Tabla migrada exitosamente")
 
 @app.route('/')
 def index():
