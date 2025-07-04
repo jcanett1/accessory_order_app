@@ -31,7 +31,7 @@ def init_db():
                 accessory_type TEXT NOT NULL,
                 quantity INTEGER NOT NULL,
                 extra_accessory BOOLEAN NOT NULL,
-                selected BOOLEAN NOT NULL,
+                selected TEXT NOT NULL CHECK(selected IN ('celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16')),
                 order_date TEXT NOT NULL
             )
         ''')
@@ -50,6 +50,11 @@ def add_order():
     extra_accessory = data['extra_accessory']
     selected = data['selected']
     order_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Validar que el valor de selected sea uno de los permitidos
+    valid_selections = ['celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16']
+    if selected not in valid_selections:
+        return jsonify({'error': 'Valor no válido para selected'}), 400
 
     db = get_db()
     cursor = db.cursor()
@@ -119,7 +124,7 @@ def export_pdf():
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     
     # Create table data
-    data = [['ID', 'Número de Orden', 'Tipo de Accesorio', 'Cantidad', 'Accesorio Extra', 'Seleccionado', 'Fecha']]
+    data = [['ID', 'Número de Orden', 'Tipo de Accesorio', 'Cantidad', 'Accesorio Extra', 'Celda', 'Fecha']]
     
     for order in orders:
         data.append([
@@ -128,7 +133,7 @@ def export_pdf():
             order['accessory_type'],
             str(order['quantity']),
             'Sí' if order['extra_accessory'] else 'No',
-            'Sí' if order['selected'] else 'No',
+            order['selected'],
             order['order_date']
         ])
     
@@ -166,5 +171,3 @@ if __name__ == '__main__':
     with app.app_context():
         init_db()
     app.run(debug=True, host='0.0.0.0')
-
-
