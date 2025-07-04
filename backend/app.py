@@ -25,57 +25,21 @@ def init_db():
         db = get_db()
         cursor = db.cursor()
         
-        # Verificar si la columna 'selected' existe
-        cursor.execute("PRAGMA table_info(orders)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        if 'selected' not in columns:
-            # Migración segura sin perder datos
-            try:
-                cursor.execute('''
-                    ALTER TABLE orders 
-                    ADD COLUMN selected TEXT 
-                    NOT NULL DEFAULT 'celda'
-                    CHECK(selected IN ('celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16'))
-                ''')
-                db.commit()
-                print("Columna 'selected' añadida correctamente")
-            except sqlite3.OperationalError as e:
-                print(f"Error al añadir columna: {e}")
-                # Si ALTER TABLE falla, usar el método de respaldo
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS new_orders (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        order_number TEXT NOT NULL,
-                        accessory_type TEXT NOT NULL,
-                        quantity INTEGER NOT NULL,
-                        extra_accessory BOOLEAN NOT NULL,
-                        selected TEXT NOT NULL DEFAULT 'celda'
-                            CHECK(selected IN ('celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16')),
-                        order_date TEXT NOT NULL
-                    )
-                ''')
-                
-                # Copiar datos
-                cursor.execute('''
-                    INSERT INTO new_orders 
-                    (id, order_number, accessory_type, quantity, extra_accessory, selected, order_date)
-                    SELECT 
-                        id, 
-                        order_number, 
-                        accessory_type, 
-                        quantity, 
-                        extra_accessory,
-                        'celda' as selected,  # Valor por defecto
-                        order_date
-                    FROM orders
-                ''')
-                
-                # Reemplazar tabla
-                cursor.execute('DROP TABLE orders')
-                cursor.execute('ALTER TABLE new_orders RENAME TO orders')
-                db.commit()
-                print("Tabla migrada exitosamente")
+        # Crear tabla si no existe con la estructura correcta
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_number TEXT NOT NULL,
+                accessory_type TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                extra_accessory BOOLEAN NOT NULL,
+                celda BOOLEAN NOT NULL,
+                order_date TEXT NOT NULL,
+                is_closed BOOLEAN DEFAULT FALSE,
+                accessories_added BOOLEAN DEFAULT FALSE
+            )
+        ''')
+        db.commit()
 
 @app.route('/')
 def index():
@@ -85,30 +49,25 @@ def index():
 def add_order():
     data = request.get_json()
     try:
-        # Validar datos
-        required_fields = ['order_number', 'accessory_type', 'quantity', 'extra_accessory', 'selected']
+        # Validar datos requeridos
+        required_fields = ['order_number', 'accessory_type', 'quantity', 'extra_accessory', 'celda']
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Faltan campos requeridos'}), 400
 
-        # Validar valor de selected
-        valid_selections = ['celda', 'celda 10', 'celda 11', 'celda 15', 'celda 16']
-        if data['selected'] not in valid_selections:
-            return jsonify({'error': f'Valor no válido para selected. Use: {", ".join(valid_selections)}'}), 400
+        # Convertir valor de celda a booleano si es necesario
+        celda_value = bool(data['celda']) if isinstance(data['celda'], (bool, int)) else data['celda'].lower() in ('true', '1', 'celda 10', 'celda 11')
 
         db = get_db()
         cursor = db.cursor()
         
-        # Forzar recarga del esquema
-        cursor.execute("PRAGMA schema_version = schema_version + 1")
-        
         cursor.execute(
-            "INSERT INTO orders (order_number, accessory_type, quantity, extra_accessory, selected, order_date) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO orders (order_number, accessory_type, quantity, extra_accessory, celda, order_date) VALUES (?, ?, ?, ?, ?, ?)",
             (
                 data['order_number'],
                 data['accessory_type'],
                 data['quantity'],
                 data['extra_accessory'],
-                data['selected'],
+                celda_value,
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             )
         )
@@ -120,6 +79,7 @@ def add_order():
         return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': f'Error inesperado: {str(e)}'}), 500
+
 @app.route('/api/get_orders', methods=['GET'])
 def get_orders():
     search_term = request.args.get('search', '')
@@ -188,7 +148,7 @@ def export_pdf():
             order['accessory_type'],
             str(order['quantity']),
             'Sí' if order['extra_accessory'] else 'No',
-            order['selected'],
+            'Sí' if order['celda'] else 'No',
             order['order_date']
         ])
     
