@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-// import DebugInfo from './components/ui/DebugInfo' // ✅ RUTA CORREGIDA
+// import DebugInfo from './components/ui/DebugInfo' // ✅ COMENTADO
 import { api } from './lib/supabase' // ✅ Importar API de Supabase
 
 function App() {
@@ -11,14 +11,17 @@ function App() {
   const [selected, setSelected] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
-  const [loading, setLoading] = useState(false); // ✅ Estado de carga
-  const [error, setError] = useState(''); // ✅ Estado de error
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // ✅ NUEVO: Estados para confirmación de cierre de órdenes
+  const [confirmationInputs, setConfirmationInputs] = useState({});
+  const [confirmationErrors, setConfirmationErrors] = useState({});
 
   useEffect(() => {
     fetchOrders();
   }, [searchTerm, dateFilter]);
 
-  // ✅ ACTUALIZADO: Usar Supabase en lugar de /api/
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -26,10 +29,8 @@ function App() {
       
       let data;
       if (searchTerm || dateFilter) {
-        // Usar búsqueda con filtros
         data = await api.searchOrders(searchTerm, dateFilter);
       } else {
-        // Obtener todas las órdenes
         data = await api.getOrders();
       }
       
@@ -42,7 +43,6 @@ function App() {
     }
   };
 
-  // ✅ ACTUALIZADO: Usar Supabase en lugar de /api/
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -64,13 +64,11 @@ function App() {
       
       await api.addOrder(newOrder);
       
-      // Limpiar formulario
       setOrderNumber('');
       setAccessories([{ accessory_type: 'bolsa', quantity: 1 }]);
       setExtraAccessory(false);
       setSelected(false);
       
-      // Recargar órdenes
       await fetchOrders();
       
       console.log('✅ Orden agregada exitosamente');
@@ -82,14 +80,51 @@ function App() {
     }
   };
 
-  // ✅ ACTUALIZADO: Usar Supabase en lugar de /api/
-  const handleCloseOrder = async (orderId, status) => {
+  // ✅ NUEVO: Función para manejar cambios en input de confirmación
+  const handleConfirmationInputChange = (orderId, value) => {
+    setConfirmationInputs(prev => ({
+      ...prev,
+      [orderId]: value
+    }));
+    
+    // Limpiar error cuando el usuario empiece a escribir
+    if (confirmationErrors[orderId]) {
+      setConfirmationErrors(prev => ({
+        ...prev,
+        [orderId]: ''
+      }));
+    }
+  };
+
+  // ✅ NUEVO: Función para validar y cerrar orden
+  const handleConfirmCloseOrder = async (orderId, orderNumber, inputValue) => {
+    // Validar que el número ingresado coincida
+    if (inputValue.trim() !== orderNumber.trim()) {
+      setConfirmationErrors(prev => ({
+        ...prev,
+        [orderId]: 'Número de orden incorrecto, verifique si está bien'
+      }));
+      return;
+    }
+
+    // Si coincide, cerrar la orden automáticamente
     try {
       setLoading(true);
       setError('');
       
-      await api.closeOrder(orderId, status);
-      await fetchOrders(); // Recargar órdenes
+      // Cerrar como "agregados" por defecto (puedes cambiar esto si necesitas otra lógica)
+      await api.closeOrder(orderId, true);
+      await fetchOrders();
+      
+      // Limpiar el input y errores
+      setConfirmationInputs(prev => ({
+        ...prev,
+        [orderId]: ''
+      }));
+      setConfirmationErrors(prev => ({
+        ...prev,
+        [orderId]: ''
+      }));
       
       console.log('✅ Orden cerrada exitosamente');
     } catch (error) {
@@ -117,7 +152,6 @@ function App() {
     setAccessories(updatedAccessories);
   };
 
-  // ✅ ACTUALIZADO: Funciones de exportación (por ahora mostrar mensaje)
   const exportToExcel = () => {
     alert('Función de exportación a Excel en desarrollo para Supabase');
     console.log('📊 Export to Excel - Orders:', orders);
@@ -128,7 +162,6 @@ function App() {
     console.log('📄 Export to PDF - Orders:', orders);
   };
 
-  // Check if form should be disabled (when extraAccessory is false)
   const isFormDisabled = !extraAccessory;
 
   return (
@@ -138,14 +171,12 @@ function App() {
           Gestión de Órdenes de Accesorios
         </h1>
         
-        {/* ✅ MOSTRAR ERRORES */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             <strong>Error:</strong> {error}
           </div>
         )}
         
-        {/* ✅ MOSTRAR ESTADO DE CARGA */}
         {loading && (
           <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
             <strong>Cargando...</strong> Por favor espere.
@@ -158,7 +189,6 @@ function App() {
             Agregar Nueva Orden
           </h2>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Order Number and Checkboxes */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-card-foreground">
@@ -209,7 +239,6 @@ function App() {
               </div>
             </div>
 
-            {/* Accessories Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium text-card-foreground">
@@ -438,20 +467,34 @@ function App() {
                           {order.accessories_added ? 'Agregados' : 'No Agregados'}
                         </span>
                       ) : (
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value !== '') {
-                              handleCloseOrder(order.id, e.target.value === 'agregados');
-                            }
-                          }}
-                          disabled={loading}
-                          className="px-2 py-1 border border-border rounded-md bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                          defaultValue=""
-                        >
-                          <option value="">Accesorios...</option>
-                          <option value="agregados">Agregados</option>
-                          <option value="no_agregados">No Agregados</option>
-                        </select>
+                        // ✅ NUEVO: Input de confirmación en lugar de dropdown
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={confirmationInputs[order.id] || ''}
+                            onChange={(e) => handleConfirmationInputChange(order.id, e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleConfirmCloseOrder(order.id, order.order_number, e.target.value);
+                              }
+                            }}
+                            placeholder="Confirmar número de orden"
+                            disabled={loading}
+                            className="w-full px-2 py-1 border border-border rounded-md bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                          />
+                          {confirmationErrors[order.id] && (
+                            <div className="text-xs text-red-600 font-medium">
+                              {confirmationErrors[order.id]}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleConfirmCloseOrder(order.id, order.order_number, confirmationInputs[order.id] || '')}
+                            disabled={loading || !confirmationInputs[order.id]?.trim()}
+                            className="w-full px-2 py-1 bg-primary text-primary-foreground rounded-md text-xs hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Cerrar Orden
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -467,8 +510,8 @@ function App() {
         </div>
       </div>
       
-      {/* ✅ AGREGAR COMPONENTE DEBUG INFO CON RUTA CORRECTA */}
-     {/* <DebugInfo /> */}  {/* ✅ COMENTAR ESTA LÍNEA */}
+      {/* ✅ COMENTADO: DebugInfo */}
+      {/* <DebugInfo /> */}
     </div>
   );
 }
