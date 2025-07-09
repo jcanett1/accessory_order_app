@@ -11,6 +11,7 @@ function App() {
   const [celda, setCelda] = useState(''); // ✅ CAMBIADO: de 'selected' a 'celda'
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [celdaFilter, setCeldaFilter] = useState(''); // ✅ NUEVO: Filtro por celda
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -18,9 +19,12 @@ function App() {
   const [confirmationInputs, setConfirmationInputs] = useState({});
   const [confirmationErrors, setConfirmationErrors] = useState({});
 
+  // ✅ NUEVO: Lista de celdas disponibles
+  const availableCeldas = ['Celda 10', 'Celda 11', 'Celda 15', 'Celda 16'];
+
   useEffect(() => {
     fetchOrders();
-  }, [searchTerm, dateFilter]);
+  }, [searchTerm, dateFilter, celdaFilter]); // ✅ AGREGADO: celdaFilter a las dependencias
 
   const fetchOrders = async () => {
     try {
@@ -32,6 +36,11 @@ function App() {
         data = await api.searchOrders(searchTerm, dateFilter);
       } else {
         data = await api.getOrders();
+      }
+      
+      // ✅ NUEVO: Filtrar por celda en el frontend
+      if (celdaFilter) {
+        data = data.filter(order => order.celda === celdaFilter);
       }
       
       setOrders(data);
@@ -157,6 +166,13 @@ function App() {
     setAccessories(updatedAccessories);
   };
 
+  // ✅ NUEVO: Función para limpiar todos los filtros
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setDateFilter('');
+    setCeldaFilter('');
+  };
+
   // ✅ FUNCIÓN PARA EXPORTAR A EXCEL (versión dinámica robusta)
   const exportToExcel = async () => {
     try {
@@ -210,8 +226,9 @@ function App() {
       ];
       worksheet['!cols'] = columnWidths;
 
-      // Generar nombre de archivo con fecha
-      const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.xlsx`;
+      // ✅ NUEVO: Nombre de archivo incluye filtro de celda si está activo
+      const celdaSuffix = celdaFilter ? `_${celdaFilter.replace(' ', '_')}` : '';
+      const fileName = `ordenes_accesorios${celdaSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
       
       // Descargar archivo
       XLSX.writeFile(workbook, fileName);
@@ -261,9 +278,10 @@ function App() {
         return;
       }
       
-      // Título del documento
+      // ✅ NUEVO: Título incluye filtro de celda si está activo
+      const titleSuffix = celdaFilter ? ` - ${celdaFilter}` : '';
       doc.setFontSize(16);
-      doc.text('Lista de Órdenes de Accesorios', 14, 22);
+      doc.text(`Lista de Órdenes de Accesorios${titleSuffix}`, 14, 22);
       
       // Fecha de generación
       doc.setFontSize(10);
@@ -308,8 +326,9 @@ function App() {
         margin: { top: 35 },
       });
 
-      // Generar nombre de archivo con fecha
-      const fileName = `ordenes_accesorios_${new Date().toISOString().split('T')[0]}.pdf`;
+      // ✅ NUEVO: Nombre de archivo incluye filtro de celda si está activo
+      const celdaSuffix = celdaFilter ? `_${celdaFilter.replace(' ', '_')}` : '';
+      const fileName = `ordenes_accesorios${celdaSuffix}_${new Date().toISOString().split('T')[0]}.pdf`;
       
       // Descargar archivo
       doc.save(fileName);
@@ -394,10 +413,9 @@ function App() {
                   required
                 >
                   <option value="">Seleccionar Celda</option>
-                  <option value="Celda 10">Celda 10</option>
-                  <option value="Celda 11">Celda 11</option>
-                  <option value="Celda 15">Celda 15</option>
-                  <option value="Celda 16">Celda 16</option>
+                  {availableCeldas.map(celdaOption => (
+                    <option key={celdaOption} value={celdaOption}>{celdaOption}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -502,12 +520,12 @@ function App() {
           )}
         </div>
 
-        {/* Search and Filter Section */}
+        {/* ✅ MEJORADO: Search and Filter Section con filtro por celda */}
         <div className="bg-card rounded-lg shadow-lg p-6 mb-8">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">
             Buscar y Filtrar
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-card-foreground">
                 Buscar por Número de Orden:
@@ -534,30 +552,77 @@ function App() {
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
+
+            {/* ✅ NUEVO: Filtro por celda */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-card-foreground">
+                Filtrar por Celda:
+              </label>
+              <select
+                value={celdaFilter}
+                onChange={(e) => setCeldaFilter(e.target.value)}
+                disabled={loading}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Todas las Celdas</option>
+                {availableCeldas.map(celdaOption => (
+                  <option key={celdaOption} value={celdaOption}>{celdaOption}</option>
+                ))}
+              </select>
+            </div>
             
-            <div className="flex space-x-2 items-end">
+            <div className="flex flex-col space-y-2">
+              {/* ✅ NUEVO: Botón para limpiar filtros */}
               <button
-                onClick={exportToExcel}
+                onClick={clearAllFilters}
                 disabled={loading}
-                className="flex-1 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium disabled:opacity-50"
+                className="w-full bg-muted text-muted-foreground px-4 py-2 rounded-md hover:bg-muted/80 transition-colors font-medium disabled:opacity-50 text-sm"
               >
-                Exportar a Excel
+                Limpiar Filtros
               </button>
-              <button
-                onClick={exportToPDF}
-                disabled={loading}
-                className="flex-1 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium disabled:opacity-50"
-              >
-                Exportar a PDF
-              </button>
+              
+              <div className="flex space-x-2">
+                <button
+                  onClick={exportToExcel}
+                  disabled={loading}
+                  className="flex-1 bg-secondary text-secondary-foreground px-3 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium disabled:opacity-50 text-sm"
+                >
+                  Excel
+                </button>
+                <button
+                  onClick={exportToPDF}
+                  disabled={loading}
+                  className="flex-1 bg-secondary text-secondary-foreground px-3 py-2 rounded-md hover:bg-secondary/90 transition-colors font-medium disabled:opacity-50 text-sm"
+                >
+                  PDF
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* ✅ NUEVO: Indicador de filtros activos */}
+          {(searchTerm || dateFilter || celdaFilter) && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-blue-800">
+                  <strong>Filtros activos:</strong>
+                  {searchTerm && <span className="ml-2 px-2 py-1 bg-blue-100 rounded text-xs">Orden: {searchTerm}</span>}
+                  {dateFilter && <span className="ml-2 px-2 py-1 bg-blue-100 rounded text-xs">Fecha: {dateFilter}</span>}
+                  {celdaFilter && <span className="ml-2 px-2 py-1 bg-blue-100 rounded text-xs">Celda: {celdaFilter}</span>}
+                </div>
+                <span className="text-sm text-blue-600 font-medium">
+                  {orders.length} resultado{orders.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Orders Table Section */}
         <div className="bg-card rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">
             Lista de Órdenes de Accesorios ({orders.length})
+            {celdaFilter && <span className="text-primary"> - {celdaFilter}</span>}
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
@@ -667,7 +732,10 @@ function App() {
             </table>
             {orders.length === 0 && !loading && (
               <div className="text-center py-8 text-muted-foreground">
-                No se encontraron órdenes que coincidan con los criterios de búsqueda.
+                {(searchTerm || dateFilter || celdaFilter) ? 
+                  'No se encontraron órdenes que coincidan con los filtros aplicados.' :
+                  'No se encontraron órdenes.'
+                }
               </div>
             )}
           </div>
