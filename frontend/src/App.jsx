@@ -20,7 +20,7 @@ function App() {
   const [confirmationErrors, setConfirmationErrors] = useState({});
 
   // ✅ NUEVO: Lista de celdas disponibles
-  const availableCeldas = ['Celda 10', 'Celda 11', 'Celda 15', 'Celda 16'];
+  const availableCeldas = ['Celda 10', 'Celda 11', 'Celda 15', 'Celda 16', 'Celda 6', 'Celda 5'];
 
   useEffect(() => {
     fetchOrders();
