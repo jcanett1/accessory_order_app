@@ -105,7 +105,7 @@ export const api = {
       const { order_number, extra_accessory, celda, accessories } = orderData
 
       // ✅ VALIDAR: Que celda sea una opción válida
-      const validCeldas = ['Celda 10', 'Celda 11', 'Celda 15', 'Celda 16']
+      const validCeldas = ['Celda 10', 'Celda 11', 'Celda 15', 'Celda 16', 'Celda 6', 'Celda 5']
       if (!validCeldas.includes(celda)) {
         throw new Error(`Celda inválida. Opciones válidas: ${validCeldas.join(', ')}`)
       }
